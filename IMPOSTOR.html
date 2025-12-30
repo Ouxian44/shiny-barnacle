@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>Juego del Impostor (Web)</title>
+
+  <style>
+    :root{
+      --bg:#0b1020; --card:#121a33; --muted:#9aa6c5; --text:#e9eeff;
+      --accent:#7c5cff; --danger:#ff4d6d; --ok:#2fe6a6; --line:#243055;
+    }
+
+    *{ box-sizing:border-box; }
+    html{ -webkit-text-size-adjust:100%; }
+
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;
+      background:
+        radial-gradient(1200px 600px at 20% 0%, #1a2450 0%, transparent 60%),
+        radial-gradient(900px 500px at 90% 10%, #251a55 0%, transparent 55%),
+        var(--bg);
+      color:var(--text);
+
+      /* d vh para móviles (evita saltos por la barra del navegador) */
+      min-height:100vh;
+      min-height:100dvh;
+
+      display:flex;
+      align-items:center;
+      justify-content:center;
+
+      /* safe area (notch) + padding base */
+      padding:
+        calc(16px + env(safe-area-inset-top))
+        calc(16px + env(safe-area-inset-right))
+        calc(16px + env(safe-area-inset-bottom))
+        calc(16px + env(safe-area-inset-left));
+    }
+
+    .wrap{ width:min(920px, 100%); }
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      padding:clamp(14px, 2.5vw, 18px);
+      box-shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+
+    h1{
+      margin:0 0 10px;
+      font-size:clamp(18px, 3.3vw, 22px);
+      letter-spacing:.2px;
+    }
+
+    p{ margin:8px 0; color:var(--muted); line-height:1.35; }
+
+    .grid{
+      display:grid;
+      gap:12px;
+      grid-template-columns:1fr;
+      margin-top:12px;
+    }
+    @media (min-width:760px){
+      .grid{ grid-template-columns: 1fr 1.2fr; }
+    }
+
+    label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+
+    input, textarea, select{
+      width:100%;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(10,14,30,.55);
+      color:var(--text);
+      padding:10px 12px;
+      outline:none;
+      /* iOS: evita zoom al enfocar */
+      font-size:16px;
+    }
+
+    textarea{ min-height:140px; resize:vertical; line-height:1.3; }
+
+    .row{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    @media (max-width:420px){
+      .row{ grid-template-columns: 1fr; }
+    }
+
+    .btns{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+    }
+
+    button{
+      border:0;
+      border-radius:12px;
+      padding:12px 14px;
+      cursor:pointer;
+      background:rgba(255,255,255,.10);
+      color:var(--text);
+      border:1px solid rgba(255,255,255,.12);
+      font-size:16px;
+      touch-action:manipulation;
+      user-select:none;
+    }
+
+    button.primary{
+      background:linear-gradient(90deg, rgba(124,92,255,.95), rgba(47,230,166,.85));
+      color:#0a0f1f;
+      font-weight:700;
+    }
+
+    button.danger{
+      background:rgba(255,77,109,.18);
+      border-color:rgba(255,77,109,.35);
+    }
+
+    button:disabled{ opacity:.55; cursor:not-allowed; }
+
+    .pill{
+      display:inline-flex; gap:8px; align-items:center;
+      padding:6px 10px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.10); background:rgba(0,0,0,.15);
+      color:var(--muted); font-size:12px;
+      max-width:100%;
+      flex-wrap:wrap;
+    }
+
+    .screen{ display:none; }
+    .screen.active{ display:block; }
+
+    .divider{ height:1px; background:rgba(255,255,255,.10); margin:14px 0; }
+
+    .big{
+      font-size:clamp(18px, 4.2vw, 24px);
+      font-weight:800;
+      letter-spacing:.3px;
+      margin:6px 0 0;
+      word-break:break-word;
+      overflow-wrap:anywhere;
+    }
+
+    .role{
+      display:inline-block; padding:6px 10px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.12); background:rgba(0,0,0,.18);
+      font-weight:800; letter-spacing:.4px;
+    }
+    .role.ok{ color:var(--ok); border-color:rgba(47,230,166,.35); background:rgba(47,230,166,.10); }
+    .role.bad{ color:var(--danger); border-color:rgba(255,77,109,.35); background:rgba(255,77,109,.10); }
+
+    .center{ display:flex; flex-direction:column; gap:10px; align-items:center; text-align:center; }
+    .hint{ font-size:12px; color:var(--muted); }
+    .mono{ font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace; }
+
+    .toast{
+      position:fixed; left:50%;
+      bottom:calc(14px + env(safe-area-inset-bottom));
+      transform:translateX(-50%);
+      background:rgba(0,0,0,.55);
+      border:1px solid rgba(255,255,255,.10);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:999px;
+      font-size:13px;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .2s ease;
+      max-width:min(92vw, 520px);
+      text-align:center;
+    }
+    .toast.show{ opacity:1; }
+
+    /* Modal */
+    .modalOverlay{
+      position:fixed; inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:
+        calc(14px + env(safe-area-inset-top))
+        calc(14px + env(safe-area-inset-right))
+        calc(14px + env(safe-area-inset-bottom))
+        calc(14px + env(safe-area-inset-left));
+    }
+    .modalOverlay.show{ display:flex; }
+
+    .modal{
+      width:min(520px, 100%);
+      max-height:min(78dvh, 620px);
+      overflow:auto;
+
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.12);
+      background:linear-gradient(180deg, rgba(18,26,51,.96), rgba(10,14,30,.92));
+      box-shadow:0 12px 40px rgba(0,0,0,.5);
+      padding:14px;
+      -webkit-overflow-scrolling:touch;
+    }
+
+    .modalTop{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+    .modalTitle{ font-weight:800; }
+    .catList{ display:grid; gap:10px; margin-top:12px; }
+    .catBtn{
+      text-align:left;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      width:100%;
+    }
+    .catBtn:hover{ background:rgba(255,255,255,.09); }
+    .catMeta{ color:var(--muted); font-size:12px; }
+    .locked{ opacity:.6; cursor:not-allowed; }
+    .kbd{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; color:var(--muted); }
+
+    /* ====== ESQUINA: Hecho por ====== */
+    .madeBy{
+      position:fixed;
+      right:calc(12px + env(safe-area-inset-right));
+      bottom:calc(12px + env(safe-area-inset-bottom));
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.12);
+      color:rgba(233,238,255,.85);
+      font-size:12px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      user-select:none;
+      pointer-events:none;
+      z-index:9999;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>👽 Juego del Impostor (formato web)</h1>
+      <p>Configura jugadores y palabras. El juego elegirá <span class="mono">1</span> impostor al azar y una palabra al azar.</p>
+
+      <!-- SETUP -->
+      <div id="screen-setup" class="screen active">
+        <div class="grid">
+          <div>
+            <div class="row">
+              <div>
+                <label for="players">Número de jugadores</label>
+                <input id="players" type="number" inputmode="numeric" min="3" max="30" value="6" />
+              </div>
+              <div>
+                <label for="impostors">Impostores</label>
+                <select id="impostors">
+                  <option value="1" selected>1 (clásico)</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                </select>
+              </div>
+            </div>
+
+            <div style="margin-top:12px">
+              <label for="mode">¿Qué ve el impostor?</label>
+              <select id="mode">
+                <option value="no-word" selected>Solo “Eres el impostor” (sin palabra)</option>
+                <option value="random-word">Una palabra aleatoria distinta (más caos)</option>
+              </select>
+            </div>
+
+            <div style="margin-top:12px">
+              <span class="pill">💡 Consejo: mínimo 3 jugadores</span>
+            </div>
+
+            <div class="btns">
+              <button class="primary" id="startBtn">Empezar partida</button>
+              <button id="fillExample">Poner un ejemplo (categorías)</button>
+            </div>
+
+            <div class="divider"></div>
+            <p class="hint">Privacidad: esto funciona sin internet, todo se queda en tu navegador.</p>
+          </div>
+
+          <div>
+            <label for="words">Listado de palabras (una por línea)</label>
+            <textarea id="words" placeholder="Ej:
+pizza
+fútbol
+playa
+dragón
+biblioteca"></textarea>
+            <p class="hint">El juego elegirá 1 palabra al azar de esta lista.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASS / REVEAL -->
+      <div id="screen-pass" class="screen">
+        <div class="center">
+          <div class="pill" id="progressPill">Jugador 1 de 6</div>
+          <div class="big">Pásale el móvil al <span class="mono" id="nextPlayerName">Jugador 1</span></div>
+          <p class="hint">Cuando lo tenga, que toque el botón para ver su rol y la palabra.</p>
+          <div class="btns">
+            <button class="primary" id="revealBtn">Ver mi rol</button>
+            <button class="danger" id="abortBtn">Reiniciar</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="screen-reveal" class="screen">
+        <div class="center">
+          <div class="pill" id="revealPill">Jugador 1</div>
+          <div id="roleTag" class="role">ROL</div>
+          <div id="wordBlock" style="margin-top:6px">
+            <div class="hint">Tu palabra es:</div>
+            <div class="big mono" id="wordText">—</div>
+          </div>
+          <p class="hint" id="revealHint">Memoriza y vuelve a ocultar antes de pasar el móvil.</p>
+          <div class="btns">
+            <button class="primary" id="hideBtn">Ocultar y pasar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- END -->
+      <div id="screen-end" class="screen">
+        <div class="center">
+          <div class="big">✅ Listo. ¡Empieza la discusión!</div>
+          <p class="hint">Si quieres, al final puedes revelar quién era el impostor (o los impostores).</p>
+
+          <div class="divider"></div>
+
+          <div class="pill">Palabra de la tripulación: <span class="mono" id="crewWord">—</span></div>
+          <div class="pill">Modo impostor: <span class="mono" id="modeLabel">—</span></div>
+
+          <div class="btns">
+            <button id="showImpostorBtn">Mostrar impostor(es)</button>
+            <button class="danger" id="newGameBtn">Nueva partida</button>
+          </div>
+
+          <div id="impostorReveal" style="display:none; margin-top:10px">
+            <div class="hint">Impostor(es):</div>
+            <div class="big mono" id="impostorList">—</div>
+            <div id="altWordWrap" style="margin-top:10px; display:none">
+              <div class="hint">Palabra del impostor (modo caos):</div>
+              <div class="big mono" id="impostorWord">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Modal Categorías -->
+  <div id="catOverlay" class="modalOverlay" role="dialog" aria-modal="true" aria-labelledby="catTitle">
+    <div class="modal">
+      <div class="modalTop">
+        <div>
+          <div id="catTitle" class="modalTitle">Elige una categoría</div>
+          <div class="catMeta">Rellenará el listado de palabras automáticamente.</div>
+        </div>
+        <button id="catClose" title="Cerrar">Cerrar</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="catList" class="catList"></div>
+
+      <div class="divider"></div>
+      <div class="catMeta">
+        Tip: también puedes cerrar con <span class="kbd">Esc</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">—</div>
+
+  <!-- ===== FIRMA EN ESQUINA ===== -->
+  <div class="madeBy">Hecho por: OUX44</div>
+
+  <script>
+    // ---------- helpers ----------
+    const $ = (id) => document.getElementById(id);
+    function toast(msg){
+      const t = $("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(()=>t.classList.remove("show"), 1600);
+    }
+    function shuffle(arr){
+      for(let i=arr.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [arr[i],arr[j]] = [arr[j],arr[i]];
+      }
+      return arr;
+    }
+    function showScreen(name){
+      ["setup","pass","reveal","end"].forEach(s => $("screen-"+s).classList.remove("active"));
+      $("screen-"+name).classList.add("active");
+    }
+
+    // ---------- categorías de ejemplo ----------
+    const CATEGORIES = [
+      {
+        id: "vida",
+        title: "1. Vida cotidiana",
+        meta: "Objetos y lugares del día a día",
+        locked: false,
+        words: [
+          "mochila","autobús","instituto","parque","ducha","llaves","ascensor","semáforo","cafetería","biblioteca",
+          "zapatillas","cuaderno","timbre","supermercado","móvil","auriculares","cama","sillón","ventana","bici"
+        ]
+      },
+      {
+        id: "comida",
+        title: "2. Comida",
+        meta: "Platos, ingredientes y sitios",
+        locked: false,
+        words: [
+          "pizza","tortilla","hamburguesa","sushi","paella","ensalada","chocolate","helado","croissant","macarrones",
+          "naranja","queso","panadería","restaurante","kebab","tacos","gazpacho","lentejas","patatas","sandwich"
+        ]
+      },
+      {
+        id: "cine",
+        title: "4. Cine",
+        meta: "Géneros, cosas de pelis, salas",
+        locked: false,
+        words: [
+          "director","palomitas","tráiler","butaca","pantalla","premio","superhéroe","villano","misterio","comedia",
+          "terror","romance","ciencia ficción","animación","acción","drama","banda sonora","créditos","secuela","saga"
+        ]
+      }
+    ];
+
+    // ---------- state ----------
+    let state = null;
+
+    function resetAll(){
+      state = null;
+      showScreen("setup");
+    }
+
+    function parseWords(raw){
+      return raw.split("\n").map(w => w.trim()).filter(Boolean);
+    }
+
+    function startGame(){
+      const nPlayers = Math.floor(Number($("players").value || 0));
+      const nImpostors = Math.floor(Number($("impostors").value || 1));
+      const mode = $("mode").value;
+
+      const words = parseWords($("words").value);
+
+      if(!Number.isFinite(nPlayers) || nPlayers < 3){
+        toast("Pon al menos 3 jugadores 🙂");
+        return;
+      }
+      if(nImpostors < 1 || nImpostors >= nPlayers){
+        toast("Impostores inválidos (deben ser menos que jugadores).");
+        return;
+      }
+      if(words.length < 1){
+        toast("Añade al menos 1 palabra.");
+        return;
+      }
+
+      const crewWord = words[Math.floor(Math.random()*words.length)];
+      let impostorWord = null;
+
+      if(mode === "random-word"){
+        const pool = words.filter(w => w !== crewWord);
+        impostorWord = pool.length ? pool[Math.floor(Math.random()*pool.length)] : crewWord;
+      }
+
+      const indices = [...Array(nPlayers).keys()];
+      shuffle(indices);
+      const impostorSet = new Set(indices.slice(0, nImpostors));
+
+      state = { nPlayers, nImpostors, mode, crewWord, impostorWord, impostorSet, current: 0 };
+
+      updatePassScreen();
+      showScreen("pass");
+      toast("Partida creada ✅");
+    }
+
+    function updatePassScreen(){
+      const i = state.current;
+      $("progressPill").textContent = `Jugador ${i+1} de ${state.nPlayers}`;
+      $("nextPlayerName").textContent = `Jugador ${i+1}`;
+    }
+
+    function revealForCurrent(){
+      const i = state.current;
+      const isImpostor = state.impostorSet.has(i);
+
+      $("revealPill").textContent = `Jugador ${i+1}`;
+      const roleTag = $("roleTag");
+      const wordBlock = $("wordBlock");
+      const wordText = $("wordText");
+
+      if(isImpostor){
+        roleTag.textContent = "IMPOSTOR";
+        roleTag.classList.remove("ok");
+        roleTag.classList.add("bad");
+
+        if(state.mode === "no-word"){
+          wordBlock.style.display = "none";
+          $("revealHint").textContent = "Tu objetivo: descubrir la palabra sin que te pillen.";
+        }else{
+          wordBlock.style.display = "block";
+          wordText.textContent = state.impostorWord;
+          $("revealHint").textContent = "Modo caos: tú tienes una palabra distinta.";
+        }
+      }else{
+        roleTag.textContent = "TRIPULACIÓN";
+        roleTag.classList.remove("bad");
+        roleTag.classList.add("ok");
+        wordBlock.style.display = "block";
+        wordText.textContent = state.crewWord;
+        $("revealHint").textContent = "Memoriza la palabra y no la digas literal 😄";
+      }
+
+      showScreen("reveal");
+    }
+
+    function hideAndNext(){
+      state.current += 1;
+
+      if(state.current >= state.nPlayers){
+        $("crewWord").textContent = state.crewWord;
+        $("modeLabel").textContent = state.mode === "no-word" ? "sin palabra" : "palabra distinta";
+
+        $("impostorReveal").style.display = "none";
+        $("altWordWrap").style.display = state.mode === "random-word" ? "block" : "none";
+        $("impostorWord").textContent = state.impostorWord || "—";
+
+        showScreen("end");
+        toast("¡Todos listos!");
+        return;
+      }
+
+      updatePassScreen();
+      showScreen("pass");
+    }
+
+    function showImpostors(){
+      const list = [];
+      for(const idx of state.impostorSet) list.push(`Jugador ${idx+1}`);
+      list.sort((a,b)=> Number(a.replace(/\D/g,"")) - Number(b.replace(/\D/g,"")));
+      $("impostorList").textContent = list.join(" · ");
+      $("impostorReveal").style.display = "block";
+    }
+
+    // ---------- modal categorías ----------
+    function openCategoryModal(){
+      const overlay = $("catOverlay");
+      const list = $("catList");
+      list.innerHTML = "";
+
+      CATEGORIES.forEach(cat => {
+        const btn = document.createElement("button");
+        btn.className = "catBtn" + (cat.locked ? " locked" : "");
+        btn.type = "button";
+
+        const left = document.createElement("div");
+        left.innerHTML = `<div><strong>${cat.title}</strong></div><div class="catMeta">${cat.meta}</div>`;
+
+        const right = document.createElement("div");
+        right.className = "catMeta";
+        right.textContent = cat.locked ? "🔒" : "➜";
+
+        btn.appendChild(left);
+        btn.appendChild(right);
+
+        if(cat.locked){
+          btn.disabled = true;
+          btn.title = "Bloqueado";
+        }else{
+          btn.addEventListener("click", () => {
+            $("words").value = cat.words.join("\n");
+            closeCategoryModal();
+            toast(`Categoría: ${cat.title}`);
+          });
+        }
+
+        list.appendChild(btn);
+      });
+
+      overlay.classList.add("show");
+    }
+
+    function closeCategoryModal(){
+      $("catOverlay").classList.remove("show");
+    }
+
+    $("catClose").addEventListener("click", closeCategoryModal);
+    $("catOverlay").addEventListener("click", (e) => {
+      if(e.target === $("catOverlay")) closeCategoryModal();
+    });
+    window.addEventListener("keydown", (e) => {
+      if(e.key === "Escape") closeCategoryModal();
+    });
+
+    // ---------- wire up ----------
+    $("startBtn").addEventListener("click", startGame);
+    $("abortBtn").addEventListener("click", resetAll);
+    $("revealBtn").addEventListener("click", revealForCurrent);
+    $("hideBtn").addEventListener("click", hideAndNext);
+    $("newGameBtn").addEventListener("click", resetAll);
+    $("showImpostorBtn").addEventListener("click", showImpostors);
+
+    $("fillExample").addEventListener("click", openCategoryModal);
+
+    $("players").addEventListener("input", () => {
+      const nPlayers = Math.max(3, Math.floor(Number($("players").value||3)));
+      const sel = $("impostors");
+      [...sel.options].forEach(opt => opt.disabled = (Number(opt.value) >= nPlayers));
+      if(Number(sel.value) >= nPlayers) sel.value = "1";
+    });
+  </script>
+</body>
+</html>
